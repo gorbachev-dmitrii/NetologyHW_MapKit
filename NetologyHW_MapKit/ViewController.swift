@@ -8,20 +8,28 @@
 import UIKit
 import MapKit
 
-class ViewController: UIViewController {
+class ViewController: UIViewController, UIGestureRecognizerDelegate {
     
-    let mapView: MKMapView = {
+    private let mapView: MKMapView = {
         let map = MKMapView()
         map.translatesAutoresizingMaskIntoConstraints = false
         map.showsScale = true
+        map.region.span = MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)
         return map
     }()
     
-    lazy var locationManager: CLLocationManager = {
+    private lazy var locationManager: CLLocationManager = {
         let location = CLLocationManager()
         location.delegate = self
         location.desiredAccuracy = kCLLocationAccuracyBest
         return location
+    }()
+    
+    private lazy var gestureRecognizer: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(
+            target: self, action:#selector(handleTap))
+        recognizer.delegate = self
+        return recognizer
     }()
     
     override func viewDidLoad() {
@@ -29,6 +37,7 @@ class ViewController: UIViewController {
         view.addSubview(mapView)
         setupConstraints()
         checkLocationAuthStatus()
+        mapView.addGestureRecognizer(gestureRecognizer)
     }
     
     private func setupConstraints() {
@@ -36,8 +45,17 @@ class ViewController: UIViewController {
             mapView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            mapView.topAnchor.constraint(equalTo: view.topAnchor)
+            mapView.topAnchor.constraint(equalTo: view.topAnchor),
         ])
+    }
+    
+    @objc private func handleTap(gestureRecognizer: UITapGestureRecognizer) {
+        let location = gestureRecognizer.location(in: mapView)
+        let coordinate = mapView.convert(location, toCoordinateFrom: mapView)
+        removeAnnotations()
+        let annotation = MKPointAnnotation()
+        annotation.coordinate = coordinate
+        mapView.addAnnotation(annotation)
     }
     
     private func checkLocationAuthStatus() {
@@ -54,6 +72,13 @@ class ViewController: UIViewController {
         }
     }
     
+    private func removeAnnotations() {
+        mapView.annotations.forEach {
+            if !($0 is MKUserLocation) {
+                mapView.removeAnnotation($0)
+            }
+        }
+    }
 }
 
 extension ViewController: CLLocationManagerDelegate {
