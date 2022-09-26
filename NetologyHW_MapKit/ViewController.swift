@@ -8,12 +8,13 @@
 import UIKit
 import MapKit
 
-class ViewController: UIViewController, UIGestureRecognizerDelegate {
+class ViewController: UIViewController, UIGestureRecognizerDelegate, MKMapViewDelegate {
     
     private let mapView: MKMapView = {
         let map = MKMapView()
         map.translatesAutoresizingMaskIntoConstraints = false
         map.showsScale = true
+        map.showsUserLocation = true
         map.region.span = MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)
         return map
     }()
@@ -32,9 +33,22 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
         return recognizer
     }()
     
+    private lazy var makeRouteButton: UIButton = {
+        let button = UIButton()
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("Построить маршрут", for: .normal)
+        button.layer.cornerRadius = 10
+        button.backgroundColor = .blue
+        button.addTarget(self, action: #selector(makeRouteButtonTaped), for: .touchUpInside)
+        return button
+    }()
+    
+    private let annotation = MKPointAnnotation()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.addSubview(mapView)
+        view.addSubview(makeRouteButton)
         setupConstraints()
         checkLocationAuthStatus()
         mapView.addGestureRecognizer(gestureRecognizer)
@@ -46,6 +60,10 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
             mapView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             mapView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             mapView.topAnchor.constraint(equalTo: view.topAnchor),
+            
+            makeRouteButton.bottomAnchor.constraint(equalTo: mapView.bottomAnchor,constant: -50),
+            makeRouteButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: +100),
+            makeRouteButton.trailingAnchor.constraint(equalTo: view.trailingAnchor,constant: -100)
         ])
     }
     
@@ -53,9 +71,12 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
         let location = gestureRecognizer.location(in: mapView)
         let coordinate = mapView.convert(location, toCoordinateFrom: mapView)
         removeAnnotations()
-        let annotation = MKPointAnnotation()
         annotation.coordinate = coordinate
         mapView.addAnnotation(annotation)
+    }
+    
+    @objc private func makeRouteButtonTaped() {
+        createDirectionRequest(startCordinate: locationManager.location!.coordinate, destinationCordinate: annotation.coordinate)
     }
     
     private func checkLocationAuthStatus() {
@@ -77,6 +98,29 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate {
             if !($0 is MKUserLocation) {
                 mapView.removeAnnotation($0)
             }
+        }
+    }
+    
+    private func createDirectionRequest(startCordinate: CLLocationCoordinate2D, destinationCordinate: CLLocationCoordinate2D) {
+        let startLocation = MKPlacemark(coordinate: startCordinate)
+        let destinationLocation = MKPlacemark(coordinate: destinationCordinate)
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: startLocation)
+        request.destination = MKMapItem(placemark: destinationLocation)
+        request.transportType = .walking
+        request.requestsAlternateRoutes = true
+        
+        let direction = MKDirections(request: request)
+        direction.calculate { (response, error) in
+            guard let response = response else {
+                print("error")
+                return
+            }
+            let route = response.routes[0]
+            self.mapView.delegate = self
+            self.mapView.addOverlay(route.polyline, level: .aboveRoads)
+            let rect = route.polyline.boundingMapRect
+            self.mapView.setRegion(MKCoordinateRegion(rect), animated: true)
         }
     }
 }
