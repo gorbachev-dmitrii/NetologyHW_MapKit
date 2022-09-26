@@ -8,13 +8,14 @@
 import UIKit
 import MapKit
 
-class ViewController: UIViewController, UIGestureRecognizerDelegate, MKMapViewDelegate {
+class ViewController: UIViewController, UIGestureRecognizerDelegate {
     
-    private let mapView: MKMapView = {
+    private lazy var mapView: MKMapView = {
         let map = MKMapView()
         map.translatesAutoresizingMaskIntoConstraints = false
         map.showsScale = true
         map.showsUserLocation = true
+        map.delegate = self
         map.region.span = MKCoordinateSpan(latitudeDelta: 0.15, longitudeDelta: 0.15)
         return map
     }()
@@ -117,7 +118,6 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate, MKMapViewDe
                 return
             }
             let route = response.routes[0]
-            self.mapView.delegate = self
             self.mapView.addOverlay(route.polyline, level: .aboveRoads)
             let rect = route.polyline.boundingMapRect
             self.mapView.setRegion(MKCoordinateRegion(rect), animated: true)
@@ -125,7 +125,7 @@ class ViewController: UIViewController, UIGestureRecognizerDelegate, MKMapViewDe
     }
 }
 
-extension ViewController: CLLocationManagerDelegate {
+extension ViewController: CLLocationManagerDelegate, MKMapViewDelegate {
     
     internal func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         if manager.authorizationStatus == .authorizedAlways  {
@@ -135,6 +135,12 @@ extension ViewController: CLLocationManagerDelegate {
     
     internal func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         mapView.setCenter(locations.first!.coordinate, animated: true)
+    }
+    
+    internal func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+        let lineView = MKPolylineRenderer(overlay: overlay)
+        lineView.strokeColor = .red
+        return lineView
     }
 }
 
